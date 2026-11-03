@@ -22,6 +22,7 @@
 | [08 协作流程](docs/08-codex-workflow.md) | 让 Codex 写代码时的任务书写法 |
 | [09 真实验收](docs/09-verification.md) | 怎么证明页面真的出现在界面里 |
 | [10 坑位速查](docs/10-pitfalls.md) | 一页纸的踩坑清单 |
+| [11 Windows 侧流水线](docs/11-windows-pipeline.md) | 把活派给 Codex 时的沙盒、所有权与成本实测（001–004） |
 
 ## 一句话结论
 
@@ -36,3 +37,5 @@
 - Node.js 26
 - pnpm workspace（`packages/*/*`）
 - DSH 源码检出，插件放在 `packages/experimental/`
+
+> 11 篇另记 Windows 侧的环境（DSH 桌面版 + Codex CLI），两边边界不同，别混用结论。
