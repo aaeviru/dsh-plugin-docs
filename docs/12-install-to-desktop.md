@@ -143,6 +143,23 @@ node_modules/@deepseek-ai/dsh-experimental-hello-page → F:\codex-work\bundle\h
 卸载走 `plugin_manager { action: "remove_bundle", target: "<包名>" }`；
 手写恢复则把备份拷回，再删掉 `node_modules` 里的链接。
 
+## 7.5 构建产物到底进没进库
+
+`bundle/` 目录里也有 `lib/`。如果仓库的 `.gitignore` 写的是 **`lib/`（前面没有斜杠）**，这个模式会匹配**任意层级**的 `lib` 目录 —— 于是 `bundle/lib/**` 全部被忽略，`git add -A` 之后你只会看到 `package.json`、`cordis.patch.yml`、`locale/*` 被提交，构建产物一个都没进库。
+
+**提交后必须核对，别信 `git status` 的前几行：**
+
+```powershell
+git ls-files bundle | Select-String 'bundle/lib'   # 应该有一串
+(git ls-files bundle | Measure-Object).Count       # 应该等于实际文件数
+```
+
+```sh
+git ls-files bundle | wc -l     # 与 find bundle -type f | wc -l 对比
+```
+
+修法：把忽略规则锚定到根目录 —— `/lib/`、`/coverage/`，而不是 `lib/`、`coverage/`。
+
 ## 8. 坑位
 
 | 现象 | 原因 | 修法 |
@@ -151,4 +168,6 @@ node_modules/@deepseek-ai/dsh-experimental-hello-page → F:\codex-work\bundle\h
 | `Cannot find package '@deepseek-ai/...'` | 装的目录只有 `src/`，没有 `lib/` | 先在源码树 `pnpm --filter <包名> run bundle` |
 | 安装被版本要求挡住 | `peerDependencies` 里的 `workspace:*` | 在 bundle 副本里删掉 peer/dev 依赖 |
 | 页面白屏、控制台报模块行缺失 | 客户端请求了目标 profile 里不存在的 `@deepseek-ai/*` 行 | 对齐版本，或改用平台内置依赖 |
-| 侧栏有图标但点开空白 | 只注册了 `sidebar.panellist`，没注册 `main` | 两个座位要成套注册 |
+| 侧栏有图标但点开空白 | 只注册了 `sidebar.pannellist`，没注册 `main` | 两个座位要成套注册 |
+| 装完界面没变化、仓库里也没有 `lib/` | `.gitignore` 的 `lib/` 匹配了 `bundle/lib` | 改成 `/lib/`，重新提交并核对 `git ls-files bundle | wc -l` |
+| `verify-npm-install-layout` 报版本不符 | `version: "0.0.0"` | 装进 profile 不拦，但进仓库门禁要真实版本号 |
