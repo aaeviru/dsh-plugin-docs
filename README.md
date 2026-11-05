@@ -24,6 +24,7 @@
 | [10 坑位速查](docs/10-pitfalls.md) | 一页纸的踩坑清单 |
 | [11 Windows 侧流水线](docs/11-windows-pipeline.md) | 把活派给 Codex 时的沙盒、所有权与成本实测（0001–0004） |
 | [12 装进桌面版](docs/12-install-to-desktop.md) | 从源码包到 profile 安装：两份清单、四处必改、三层验证 |
+| [13 link 还是拷贝](docs/13-link-vs-copy.md) | 本地目录安装为什么是链接、依赖为什么找不到、什么时候该用 tarball |
 
 ## 一句话结论
 
