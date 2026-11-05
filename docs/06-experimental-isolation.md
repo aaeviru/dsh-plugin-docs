@@ -28,6 +28,27 @@ apps/web/tests/client-ui-stats-panel.overlay.yml
       name: '@deepseek-ai/dsh-experimental-hello-page'
 ```
 
+## 按包名插入前，先确认有 tsconfig 别名
+
+overlay 里写的是**包名**，而加载器是经 tsx 解析包名的 —— tsx 用的是 `tsconfig.base.json` 的 `paths`。所以包必须在这份映射里有一席之地，否则启动时报：
+
+```
+downloader (...): failed to import: ERR_MODULE_NOT_FOUND: Cannot find package
+'@deepseek-ai/dsh-experimental-xxx' imported from <DSH_HOME>/profiles/web/
+```
+
+`gen-tsconfig-paths` 只给「包名与目录同名」的包自动生成；**不同名时它明确拒绝**，必须手写：
+
+```json
+"@deepseek-ai/dsh-experimental-xxx": ["./packages/experimental/xxx/src"],
+"@deepseek-ai/dsh-experimental-xxx/types": ["./packages/experimental/xxx/src/types.ts"],
+"@deepseek-ai/dsh-experimental-xxx/client": ["./packages/experimental/xxx/src/client/index.ts"],
+```
+
+补完跑 `pnpm exec tsx scripts/gen-tsconfig-paths.ts --check`，要靠「package aliases are current」。
+
+> 临时绕过：把 overlay 的 `name` 写成构建产物绝对路径（`.../lib/index.js`）也能加载，但这样就绕过了别名机制，一旦包被移动或改名就会静默失效 —— 只适合应急。
+
 ## 启动
 
 ```sh

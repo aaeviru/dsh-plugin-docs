@@ -132,6 +132,32 @@
 
 ---
 
+---
+
+### 18. overlay 按包名插入报 `ERR_MODULE_NOT_FOUND`
+
+**现象**：`dsh web --patch <overlay>` 启动时提示 `1 entry did not activate`，错误是找不到包，且提示路径指向 `<DSH_HOME>/profiles/web/`。
+**原因**：加载器经 tsx 用 `tsconfig.base.json` 的 `paths` 解析包名，而该包没有别名（`gen-tsconfig-paths` 只处理「包名与目录同名」的包）。
+**修法**：手写三条别名（包、`/types`、`/client`），见 [06](06-experimental-isolation.md)。
+
+---
+
+### 19. 改包名后报 `TYPERT manifest names package ...`
+
+**现象**：`typert-loader: ... TYPERT manifest names package "old-name" — the manifest must be owned by the package that exports it`，插件不激活。
+**原因**：`lib/typert.host.js` / `lib/typert.remote-client.js` 是**生成物**，里面写死了生成时的包名；改 `package.json` 的 `name` 之后没有重新生成。
+**修法**：重跑 `pnpm exec tsx scripts/generate-typert.ts`，确认产物里的包名已更新，再重新构建。
+
+---
+
+### 20. 客户端 bundle 报 `client bundle isolation ... experimental input`
+
+**现象**：客户端打包失败，错误指出某个 `lib/typert.remote-client.js` 是 experimental input。
+**原因**：隔离门禁按**包名前缀**判断实验身份（`@deepseek-ai/dsh-experimental-*`）。包叫别的名字时会被当成正式包，正式包的客户端 bundle 不允许引用实验目录里的产物。
+**修法**：把包名改成带 `dsh-experimental-` 前缀（与 hello-page 一致）；客户端里不要用包名自引 `xxx/types`，改用相对源码路径。
+
+---
+
 ## 一页纸总结
 
 | 阶段 | 最容易漏 |
