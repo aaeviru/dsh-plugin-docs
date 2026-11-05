@@ -158,6 +158,65 @@
 
 ---
 
+---
+
+### 21. 派给 Codex 的活，它经常跑不了门禁
+
+**现象**：`vitest` 报 `EROFS: read-only file system ... node_modules/.vite-temp`；`server.listen(127.0.0.1)` 报 `EPERM`；或整轮直接失败（`category: limit` / `category: service`）。
+**原因**：Codex worker 跑在自己的沙箱里 —— harness 检出对它是只读的，本地监听被禁，且有用量/服务上限。
+**修法**：任务书里就写明「跑不了就用仓库内等价命令，并如实标注」；**验收必须自己重跑**，它的自述只当参考。需要 stub HTTP 的测试（如 aria2 客户端）只能由验收方跑。
+
+---
+
+### 22. 首启弹窗不是 Escape 能关的
+
+**现象**：Playwright 点击超时，提示 `<div aria-hidden="true" class="_mask_..."> intercepts pointer events`；连按 Escape 无效。
+**原因**：挡路的是 **"Preview Notice"**（0.2 预览提示），只有一个 `Continue` 按钮。
+**修法**：循环处理 —— 有遮罩时优先点 `Continue | Got it | Close`，没有再按 Escape：
+
+```js
+for (let i = 0; i < 5 && await page.locator('div[aria-hidden="true"][class*="_mask_"]').count(); i += 1) {
+  const cont = page.getByRole('button', { name: /Continue|Got it|Close/i })
+  if (await cont.count()) await cont.first().click().catch(() => {})
+  else await page.keyboard.press('Escape')
+  await page.waitForTimeout(1200)
+}
+```
+
+---
+
+### 23. `noExternal` 已废弃，内联依赖要用 `deps.alwaysBundle`
+
+**现象**：tsdown 报 `` `noExternal` is deprecated. Cannot be used with `deps.alwaysBundle`. ``
+**原因**：tsdown 0.22 改用了 `deps.alwaysBundle`；共享 preset 已经设置了它。
+**修法**：要在产物里内联某个依赖（让 bundle 自包含），写
+
+```ts
+clientBundle(import.meta.dirname, ['lib/types/index.js'], {
+  lib: { deps: { alwaysBundle: [/^fast-xml-/] } },
+})
+```
+
+判断是否内联成功：`grep -E "^import .* from ['\"](lib-name)" lib/index.js` 应该为空，产物体积会明显变大。
+
+---
+
+### 24. `rsync --delete` 会把仓库独有的目录删掉
+
+**现象**：从源码目录同步回独立仓库后，仓库里的 `bundle/`（或其他只存在于仓库的产物目录）整块消失，还被一起提交了。
+**原因**：`--delete` 让目标与源完全一致，源里没有的目录就被删除。
+**修法**：同步时显式排除：`rsync -a --delete --exclude bundle --exclude .env ...`；提交后核对 `git ls-files <dir> | wc -l` 与磁盘文件数。
+
+---
+
+### 25. 独立仓库装依赖：位置和 lockfile
+
+**现象**：在插件仓库目录里跑 `pnpm install` / `npm install` 失败（`EUNSUPPORTEDPROTOCOL: workspace:*` 或找不到 workspace）。
+**原因**：`workspace:*` 只在 pnpm workspace 内解析；插件的真身虽然是独立仓库，但它被符号链接或复制进了 harness 的 `packages/*/*`。
+**修法**：在 **harness 根目录**跑 `pnpm install --filter <包名>`。副作用是根 `pnpm-lock.yaml` 多一条 importer 记录 —— **这条不要提交**，CI 上没有该目录。
+
+---
+
 ## 一页纸总结
 
 | 阶段 | 最容易漏 |

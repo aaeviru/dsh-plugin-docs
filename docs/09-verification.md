@@ -51,8 +51,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 await page.goto(TOKEN_URL, { waitUntil: 'load', timeout: 40000 })
 await page.waitForTimeout(7000)
 
-// 关掉首启弹窗（见下面的坑）
-await page.keyboard.press('Escape')
+// 关掉首启弹窗（Preview Notice 要点 Continue，Escape 无效；见坑 22）
+await page.getByRole('button', { name: /Continue|Got it|Close/i }).first().click().catch(() => {})
 
 await page.locator('button[aria-label="Hello"]').click()
 console.log(await page.locator('h1').allTextContents())      // ["Hello page"]
@@ -106,7 +106,7 @@ const hit = await page.evaluate(() => {
 1. **首启预览弹窗**（"DSH Harness 0.2 还在预览"）—— 全屏 `_mask_*` 遮罩
 2. **API Key 登录框** —— 关掉第一个之后才露出来
 
-两个都能用 `Escape` 关掉。注意它们只在**全新 profile 首次启动**时出现。
+**Preview Notice 只有一个 `Continue` 按钮，Escape 无效**（实测）；点掉它之后才可能露出下一层。它们只在**全新 profile 首次启动**时出现。
 
 ## 另外两个环境细节
 
