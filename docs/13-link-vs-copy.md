@@ -39,8 +39,7 @@ dsh plugin --profile demo add ./my-plugin      # CLI
 
 这就是"明明 profile 里装了、还是找不到"的根。
 
-> 注意区别：`@deepseek-ai/*` 那几个平台包不会报错，因为 harness 自己有解析路径；
-> 只有真正的 npm 第三方依赖会炸。
+> 宿主明确提供的 peer 可能由 Host 的加载上下文解析；这不保证任意 `@deepseek-ai/*` 包都可用，也不保证裸 Node 导入能解析同样的包。客户端模块行则须单独确认目标版本是否提供。
 
 ## 怎么判断当前装的是 link
 
@@ -54,7 +53,7 @@ Get-Item "$env:USERPROFILE\.dsh\profiles\desktop\node_modules\@deepseek-ai\<包�
   Select-Object LinkType,Target
 ```
 
-`LinkType: SymbolicLink` 就是 link。**版本号**（如 `0.2.1-rc.5`）才是真安装。
+以 profile 清单里的 specifier 为准：`link:` 表示链接源码目录，`file:...tgz` 或 registry 版本表示从包产物安装。包管理器内部也可能使用链接，不能只凭 `LinkType` 判断安装来源。
 
 ## 修法 A：开发期，让包自带依赖
 
@@ -91,25 +90,25 @@ Select-String -Path .\bundle\lib\index.js -Pattern '^import .* from "' | ForEach
 tarball 安装是**真解包**，不是链接，所以：
 
 - 依赖按 `package.json` 的 `dependencies` 装（前提是你声明了）
-- 装完 `LinkType` 不再是 `SymbolicLink`
+- 安装来源不再是原源码目录的 `link:`；允许包管理器内部链接
 - 源目录可以删
 
-前置条件：`bundle/package.json` 必须有 `dependencies`，否则 tarball 装完照样缺包。
+前置条件：每个未内联的运行期依赖都要有明确来源。可独立安装的叶子库可声明为 `dependencies`；宿主提供的包保留为 peer，其余 DSH 包和本例使用的库内联进 `lib/`，见 [12 §3](12-install-to-desktop.md#3-组装一个可安装的-bundle)。全部内联、只留宿主 peer 时，`dependencies` 可以为空；不能把宿主 peer 链补成安装依赖。
 
 ## 装完之后怎么确认"真的装进去了"
 
-逐条跑，全部通过才算换成拷贝安装：
+先核对安装来源，再在具备宿主 peer 的环境中核对运行期解析：
 
 | 判据 | 命令 | 期望 |
 |---|---|---|
 | 依赖不是链接 | 看 profile 的 `dependencies` | `file:...tgz` 或版本号，**不含 `link:`** |
-| 目录是实体 | `Get-Item node_modules\<包名> \| Select LinkType,Target` | 两者都为空 |
+| 安装来源已分离 | 对照 `Get-Item node_modules\<包名> \| Select LinkType,Target` 与清单、lockfile | 未链接原源码目录；允许包管理器内部链接 |
 | lockfile 有真实解析 | 在 `pnpm-lock.yaml` 里搜包名 | 有 `specifier:` 与完整的 peer 解析链，而不是单个 link importer |
-| 能被导入 | 在 profile 目录下 `node -e "import('<包名>').then(()=>console.log('IMPORT_OK'))"` | `IMPORT_OK` |
+| 能被导入 | 在显式提供声明的宿主 peer 的测试 profile 中执行 `node -e "import('<包名>').then(()=>console.log('IMPORT_OK'))"`，并核对退出码 | `IMPORT_OK`；实际 Host 加载与功能仍须另验 |
 
 前三条管的是"安装结构"，第四条管的是"运行时解析"。**它们不是一回事**，下一节就是反例。
 
-## peer-only 包：`IMPORT_OK` 会失败，但插件是好的
+## peer-only 包：裸 Node 导入与 Host 加载分别验证
 
 把依赖全部内联、只留 `@deepseek-ai/cordis` 作为 peer 之后，会出现这样的组合：
 
@@ -120,17 +119,19 @@ tarball 安装是**真解包**，不是链接，所以：
                imported from .../dsh-experimental-downloader/lib/index.js
 ```
 
-这不是打包错，是 **peer 的正确行为**：
+这组实测结果说明：**裸 Node 导入没有使用 Host 的 peer 解析上下文**：
 
-- pnpm 不会为 `file:` 依赖安装 peer；
-- profile 的 `node_modules` 里本来就没有 `@deepseek-ai/cordis`；
-- host 加载插件时用的是**自己的** cordis 实例。
+- 该次安装没有把 peer 装到 profile；不要把它概括成所有 pnpm 版本和设置的固定行为；
+- 裸 Node 从 profile 导入时找不到 `@deepseek-ai/cordis`；
+- 实际 Host 加载和工具调用成功，是另一份运行期证据。
 
 如果为了凑 `IMPORT_OK` 把 cordis 也声明成 `dependencies`，profile 里就会多出第二份 cordis，插件拿到的 `Context`/`Service` 与宿主不是同一个类，`instanceof` 会失效——**用错误的修法换一个漂亮的检查结果**。
 
 所以这条判据要写成：
 
-> 在 host 的解析上下文里检查，或允许唯一未解析项就是包声明的那一个 peer。
+> 在实际 Host 中加载并调用插件；独立 Node 回归则使用显式提供宿主 peer 的隔离测试环境。若裸导入缺少声明的 peer，记录该检查的限制，不能据此放过其他尚未执行到的导入，也不能把缺包直接当作完整验收通过。
+
+downloader 的 `scripts/verify-install.sh` 在检查安装没有引入宿主包之后，显式为隔离测试 profile 提供 `@deepseek-ai/cordis`，再要求 `IMPORT_OK`。测试 peer 的提供与生产 Host 是否被插件安装污染应分开检查。
 
 ## 坑位
 
@@ -141,10 +142,11 @@ tarball 安装是**真解包**，不是链接，所以：
 | `git ls-files` 里看不到 `lib/` | `.gitignore` 的 `lib/` 匹配了任意层级 | 改成 `/lib/`，见 [12](12-install-to-desktop.md) |
 | 装完 profile 里是 `link:` | 目标传的是目录 | 想要拷贝就用 tarball / npm |
 | 删了源码目录插件消失 | link 的本质 | 分发时改用 tarball |
-| `IMPORT_OK` 失败但面板正常 | 只剩 peer 未解析，属正确行为 | 放宽判据，不要重复装 peer |
+| `IMPORT_OK` 缺少声明的 peer，但面板正常 | 裸 Node 与 Host 的解析上下文不同 | 在提供测试 peer 的隔离环境中重验，并保留实际 Host 证据；不要把宿主包改成生产依赖 |
 | 换成 tgz 后仍报旧路径的错 | 运行中的 host 还持有上一次加载失败的行 | 重启后再看 |
+| 改成 tgz 后新建会话失败，报 `deployment:persona-prefix is already registered` | 插件安装带入宿主服务包及其 peer 链 | 宿主包保留为 peer，其余依赖内联；比较安装前后清单并移除污染 |
 
 ## 一句话
 
 > **link 是开发形态，tarball 是分发型态。**
-> 你从目录装，就必然得到链接；想让别人拿到一份能直接跑的副本，就把 `lib/` 和 `dependencies` 一起打包。
+> 本文所述 DSH 本地目录安装使用 `link:`；交付时打包 `lib/`、bundle patch 与完整清单，用 tarball / npm 安装，并分别核对宿主 peer、叶子依赖和内联产物。
