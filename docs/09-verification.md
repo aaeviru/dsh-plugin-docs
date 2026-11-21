@@ -60,6 +60,10 @@ await page.getByRole('button', { name: 'Increment', exact: true }).click()
 console.log(await page.getByText(/^Count:/).first().textContent())  // "Count: 1"
 ```
 
+### 外置插件的安装包验收
+
+交付 `.tgz` 的插件可以先把安装包装进隔离的 Web profile，再复用这三层检查。Media Library v0.7.7 的脚本检查 profile 依赖指向安装包，验证 boot payload 与 bundle 路由，最后在 Chromium 点击页面并用匿名 SQLite 样本检查真实 Host RPC。这个案例的运行证据来自 Linux 上的 DSH Web。 [Media Library 冷安装与浏览器验证](https://github.com/aaeviru/dsh-media-library/blob/1a236fd104c6d62a56324a2eda1e0e2203959a60/scripts/verify-web.sh#L40)
+
 ### 三个必踩的坑
 
 **1. 浏览器要装在沙箱可写的位置**

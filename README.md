@@ -20,7 +20,7 @@
 | [06 实验包隔离](docs/06-experimental-isolation.md) | 实验包不能进正式 bundle，只能靠 overlay 加载 |
 | [07 门禁清单](docs/07-gates.md) | 该跑哪些命令、典型报错长什么样 |
 | [08 协作流程](docs/08-codex-workflow.md) | 让 Codex 写代码时的任务书写法 |
-| [09 真实验收](docs/09-verification.md) | 怎么证明页面真的出现在界面里 |
+| [09 真实验收](docs/09-verification.md) | 浏览器验证与外置插件安装包验收 |
 | [10 坑位速查](docs/10-pitfalls.md) | 一页纸的踩坑清单 |
 | [11 Windows 侧流水线](docs/11-windows-pipeline.md) | 把活派给 Codex 时的沙盒、所有权与成本实测（0001–0004） |
 | [12 装进桌面版](docs/12-install-to-desktop.md) | 从源码包到 profile 安装：tarball、宿主 peer、依赖内联与六项验收 |
