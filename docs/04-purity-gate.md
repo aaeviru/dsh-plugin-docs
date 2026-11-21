@@ -4,7 +4,7 @@
 
 客户端 bundle 里，**任何 `@deepseek-ai/*` 的"值"导入都会被构建期拒绝**，除非它属于：
 
-1. 宿主基线模块表（`PLATFORM_MODULES`，如 `react`、`react/jsx-runtime`、`@deepseek-ai/cordis`）
+1. 目标宿主的基线模块表（`PLATFORM_MODULES`，如 `react`、`react/jsx-runtime`、`@deepseek-ai/cordis`）
 2. 本包在 `dsh.client.external` 里显式声明的
 3. 白名单里的"可内联线格式层"（`INLINE_SAFE`）
 4. 生成的 `/remote` 贡献
@@ -16,16 +16,18 @@ client bundle purity: "<specifier>" is not in the default client externals or <i
 an inline-safe wire layer, or a generated /remote contribution — cross-plugin value imports are forbidden
 ```
 
-## 类型导入是安全的
+## 类型导入与宿主提供的值导入
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'                 // ✅ 编译后消失
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'   // ✅ 只为拉 Context 类型合并
 import { useState } from 'react'                                   // ✅ react 在基线里
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'     // ❌ 值导入，构建失败
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'     // ✅ 目标宿主的基线表包含此包时可用
 ```
 
 `import type` 在打包前被完全抹除，**根本到不了门禁**。
+
+以目标宿主版本的 `packages/client/web/src/platform.ts` 为准。Harness `fcc0ad4621` 的基线表包含 `@deepseek-ai/dsh-client-ui-primitives`。客户端 bundle 会把这类导入保留为外部引用，由宿主提供模块。Media Library v0.7.7 在该宿主上完成了构建与 Web 安装包冷验收。 [宿主模块表](https://github.com/deepseek-ai/deepseek-harness/blob/fcc0ad462172522aaf5c93a7b2e01f6b9f0b0159/packages/client/web/src/platform.ts#L8) · [Media Library 导入示例](https://github.com/aaeviru/dsh-media-library/blob/1a236fd104c6d62a56324a2eda1e0e2203959a60/src/client/ui/primitives.ts#L1)
 
 ## 为什么这么严
 
@@ -44,7 +46,7 @@ import { Button } from '@deepseek-ai/dsh-client-ui-primitives'     // ❌ 值导
 grep -oE 'require\("[^"]+"\)' packages/experimental/hello-page/lib/client.js | sort -u
 ```
 
-正常应该只剩基线模块：
+hello-page 的示例输出是它实际使用的基线模块：
 
 ```
 require("react")
